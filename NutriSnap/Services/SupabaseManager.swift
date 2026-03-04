@@ -422,6 +422,21 @@ final class SupabaseManager {
         }
     }
 
+    // MARK: - Delete BodyMeasurement
+
+    func deleteBodyMeasurement(id: String) {
+        Task.detached {
+            do {
+                try await self.client.from("body_measurements")
+                    .delete()
+                    .eq("id", value: id)
+                    .execute()
+            } catch {
+                print("[Supabase] deleteBodyMeasurement error: \(error)")
+            }
+        }
+    }
+
     // MARK: - Fetch BodyMeasurements
 
     func fetchBodyMeasurements(userName: String) async -> [BodyMeasurementRow] {

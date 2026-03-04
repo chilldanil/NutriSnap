@@ -153,6 +153,12 @@ final class DailyLogViewModel {
     func updateFood(_ food: FoodItem, grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double) {
         guard let log = todayLog else { return }
 
+        // Capture old values for HealthKit delta correction
+        let oldCal = food.calories
+        let oldPro = food.protein
+        let oldFat = food.fat
+        let oldCarbs = food.carbs
+
         food.grams = grams
         food.calories = calories
         food.protein = protein
@@ -164,6 +170,25 @@ final class DailyLogViewModel {
         // Update widget & Live Activity
         WidgetCenter.shared.reloadAllTimelines()
         LiveActivityManager.shared.updateActivity(from: log)
+
+        // Sync the difference to HealthKit (positive delta only; negatives are HealthKit limitation)
+        if isHealthKitEnabled {
+            let dCal = calories - oldCal
+            let dPro = protein - oldPro
+            let dFat = fat - oldFat
+            let dCarbs = carbs - oldCarbs
+            // Only write if there's a positive increase (HealthKit appends, can't subtract)
+            if dCal > 0 || dPro > 0 || dFat > 0 || dCarbs > 0 {
+                Task.detached {
+                    try? await HealthKitManager.shared.saveFoodItem(
+                        calories: max(0, dCal),
+                        protein: max(0, dPro),
+                        fat: max(0, dFat),
+                        carbs: max(0, dCarbs)
+                    )
+                }
+            }
+        }
     }
 
     func removeFood(_ food: FoodItem, from mealType: MealType) {

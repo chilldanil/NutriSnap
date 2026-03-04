@@ -342,9 +342,11 @@ struct OnboardingView: View {
     }
 
     private func saveProfile() {
+        let weight = Double(weightText) ?? 70
+
         let profile = UserProfile(
             gender: gender,
-            weight: Double(weightText) ?? 70,
+            weight: weight,
             height: Double(heightText) ?? 175,
             age: Int(ageText) ?? 25,
             goal: goal,
@@ -355,8 +357,18 @@ struct OnboardingView: View {
         profile.isOnboarded = true
 
         modelContext.insert(profile)
+
+        // Create initial BodyMeasurement so Body tab has its first data point
+        let measurement = BodyMeasurement(
+            userName: userName,
+            date: Date(),
+            weight: weight
+        )
+        modelContext.insert(measurement)
+
         try? modelContext.save()
         SupabaseManager.shared.pushProfile(profile)
+        SupabaseManager.shared.pushBodyMeasurement(measurement)
     }
 }
 

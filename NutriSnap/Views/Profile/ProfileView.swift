@@ -357,9 +357,12 @@ struct EditProfileSheet: View {
     }
 
     private func saveChanges() {
+        let oldWeight = profile.weight
+        let newWeight = Double(weightText) ?? profile.weight
+
         profile.gender = gender
         profile.age = Int(ageText) ?? profile.age
-        profile.weight = Double(weightText) ?? profile.weight
+        profile.weight = newWeight
         profile.height = Double(heightText) ?? profile.height
         profile.goal = goal
         profile.activityLevel = activityLevel
@@ -373,6 +376,24 @@ struct EditProfileSheet: View {
             profile.targetCarbs = Double(customCarbs) ?? profile.targetCarbs
         } else {
             profile.recalculateTargets()
+        }
+
+        // If weight changed, create a BodyMeasurement and sync to HealthKit
+        let weightChanged = abs(oldWeight - newWeight) > 0.01
+        if weightChanged {
+            let measurement = BodyMeasurement(
+                userName: profile.userName,
+                date: Date(),
+                weight: newWeight
+            )
+            modelContext.insert(measurement)
+            SupabaseManager.shared.pushBodyMeasurement(measurement)
+
+            if profile.isHealthKitEnabled {
+                Task {
+                    try? await HealthKitManager.shared.saveWeight(kg: newWeight)
+                }
+            }
         }
 
         try? modelContext.save()

@@ -3,11 +3,13 @@ import SwiftData
 import Charts
 
 struct BodyTrackingView: View {
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("currentUser") private var currentUser = ""
     @Query(sort: \BodyMeasurement.date, order: .reverse)
     private var allMeasurements: [BodyMeasurement]
 
     @State private var showAddSheet = false
+    @State private var editingMeasurement: BodyMeasurement?
     @State private var chartPeriod: ChartPeriod = .threeMonths
 
     private var measurements: [BodyMeasurement] {
@@ -54,6 +56,10 @@ struct BodyTrackingView: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 AddMeasurementSheet(previous: latest)
+                    .presentationDetents([.large])
+            }
+            .sheet(item: $editingMeasurement) { measurement in
+                AddMeasurementSheet(editing: measurement)
                     .presentationDetents([.large])
             }
         }
@@ -344,6 +350,20 @@ struct BodyTrackingView: View {
 
             ForEach(measurements.prefix(20)) { entry in
                 historyRow(entry)
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingMeasurement = entry }
+                    .contextMenu {
+                        Button {
+                            editingMeasurement = entry
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            deleteMeasurement(entry)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 if entry.id != measurements.prefix(20).last?.id {
                     Divider().padding(.leading, 50)
                 }
@@ -384,8 +404,20 @@ struct BodyTrackingView: View {
                 }
             }
             Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Delete
+
+    private func deleteMeasurement(_ entry: BodyMeasurement) {
+        SupabaseManager.shared.deleteBodyMeasurement(id: entry.id.uuidString)
+        modelContext.delete(entry)
+        try? modelContext.save()
     }
 }
 
