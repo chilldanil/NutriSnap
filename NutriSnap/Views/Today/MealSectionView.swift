@@ -5,6 +5,7 @@ struct MealSectionView: View {
     let meal: MealEntry
     let onAddFood: () -> Void
     var onDeleteFood: ((FoodItem) -> Void)?
+    var onTapFood: ((FoodItem) -> Void)?
 
     @State private var isExpanded = true
     @State private var foodToDelete: FoodItem?
@@ -67,7 +68,16 @@ struct MealSectionView: View {
                     VStack(spacing: 0) {
                         ForEach(meal.foods, id: \.id) { food in
                             FoodRowView(food: food)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    onTapFood?(food)
+                                }
                                 .contextMenu {
+                                    Button {
+                                        onTapFood?(food)
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
                                     Button(role: .destructive) {
                                         foodToDelete = food
                                     } label: {

@@ -150,6 +150,22 @@ final class DailyLogViewModel {
         }
     }
 
+    func updateFood(_ food: FoodItem, grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double) {
+        guard let log = todayLog else { return }
+
+        food.grams = grams
+        food.calories = calories
+        food.protein = protein
+        food.fat = fat
+        food.carbs = carbs
+        try? modelContext.save()
+        SupabaseManager.shared.pushDailyLog(log)
+
+        // Update widget & Live Activity
+        WidgetCenter.shared.reloadAllTimelines()
+        LiveActivityManager.shared.updateActivity(from: log)
+    }
+
     func removeFood(_ food: FoodItem, from mealType: MealType) {
         guard let log = todayLog,
               let meal = log.meals.first(where: { $0.mealType == mealType }) else { return }

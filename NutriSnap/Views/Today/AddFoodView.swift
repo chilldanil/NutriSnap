@@ -38,6 +38,9 @@ struct AddFoodView: View {
     // Detail sheet
     @State private var selectedResult: EdamamFoodResult?
 
+    // Portion adjust (for Recent / My Products tap)
+    @State private var portionAdjust: PortionAdjustData?
+
     // Manual entry toggle
     @State private var showManual = false
     @State private var manName = ""
@@ -138,6 +141,29 @@ struct AddFoodView: View {
                     onSave([foodItem])
                     dismiss()
                 }
+            }
+            .sheet(item: $portionAdjust) { data in
+                PortionAdjustSheet(
+                    name: data.name,
+                    baseCalories: data.calories,
+                    baseProtein: data.protein,
+                    baseFat: data.fat,
+                    baseCarbs: data.carbs,
+                    baseGrams: data.grams
+                ) { grams, cal, pro, fat, carbs in
+                    let food = FoodItem(
+                        name: data.name,
+                        calories: cal,
+                        protein: pro,
+                        fat: fat,
+                        carbs: carbs,
+                        grams: grams,
+                        edamamFoodId: data.edamamFoodId
+                    )
+                    onSave([food])
+                    dismiss()
+                }
+                .presentationDetents([.large])
             }
             .confirmationDialog("Add Photo", isPresented: $showImageSourcePicker) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -301,9 +327,15 @@ struct AddFoodView: View {
     }
 
     private func quickAddProduct(_ product: SavedProduct) {
-        let food = product.toFoodItem()
-        onSave([food])
-        dismiss()
+        portionAdjust = PortionAdjustData(
+            name: product.name,
+            calories: product.calories,
+            protein: product.protein,
+            fat: product.fat,
+            carbs: product.carbs,
+            grams: product.defaultGrams,
+            edamamFoodId: nil
+        )
     }
 
     // MARK: - AI recognition cards
@@ -731,7 +763,7 @@ struct AddFoodView: View {
     }
 
     private func quickAddRecent(_ food: FoodItem) {
-        let newFood = FoodItem(
+        portionAdjust = PortionAdjustData(
             name: food.name,
             calories: food.calories,
             protein: food.protein,
@@ -740,8 +772,6 @@ struct AddFoodView: View {
             grams: food.grams,
             edamamFoodId: food.edamamFoodId
         )
-        onSave([newFood])
-        dismiss()
     }
 
     private func saveManual() {
@@ -756,6 +786,19 @@ struct AddFoodView: View {
         onSave([food])
         dismiss()
     }
+}
+
+// MARK: - Portion adjust data
+
+private struct PortionAdjustData: Identifiable {
+    let id = UUID()
+    let name: String
+    let calories: Double
+    let protein: Double
+    let fat: Double
+    let carbs: Double
+    let grams: Double
+    let edamamFoodId: String?
 }
 
 #Preview {

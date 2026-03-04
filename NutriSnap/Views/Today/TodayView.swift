@@ -11,6 +11,7 @@ struct TodayView: View {
     @State private var showAddFood = false
     @State private var selectedMealType: MealType = .breakfast
     @State private var showCopiedToast = false
+    @State private var foodToEdit: FoodItem?
 
     private var navigationState = NavigationState.shared
     private var log: DailyLog? { viewModel?.todayLog }
@@ -95,6 +96,9 @@ struct TodayView: View {
                                     },
                                     onDeleteFood: { food in
                                         viewModel?.removeFood(food, from: meal.mealType)
+                                    },
+                                    onTapFood: { food in
+                                        foodToEdit = food
                                     }
                                 )
                             }
@@ -134,6 +138,19 @@ struct TodayView: View {
                     } else {
                         viewModel?.addFoods(foods, to: selectedMealType)
                     }
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(item: $foodToEdit) { food in
+                PortionAdjustSheet(
+                    name: food.name,
+                    baseCalories: food.calories,
+                    baseProtein: food.protein,
+                    baseFat: food.fat,
+                    baseCarbs: food.carbs,
+                    baseGrams: food.grams
+                ) { grams, cal, pro, fat, carbs in
+                    viewModel?.updateFood(food, grams: grams, calories: cal, protein: pro, fat: fat, carbs: carbs)
                 }
                 .presentationDetents([.large])
             }
