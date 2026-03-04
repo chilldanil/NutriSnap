@@ -7,7 +7,9 @@ struct AddFoodView: View {
     let onSave: ([FoodItem]) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("currentUser") private var currentUser = ""
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
+    @Query(sort: \SavedProduct.name) private var allSavedProducts: [SavedProduct]
 
     // Search
     @State private var searchText = ""
@@ -59,8 +61,16 @@ struct AddFoodView: View {
         return result
     }
 
+    private var myProducts: [SavedProduct] {
+        allSavedProducts.filter { $0.userName == currentUser }
+    }
+
+    private var showIdleSections: Bool {
+        searchText.isEmpty && searchResults.isEmpty && !isSearching && !isRecognizing && !isParsing && parsedFoods.isEmpty
+    }
+
     private var showRecentSection: Bool {
-        searchText.isEmpty && searchResults.isEmpty && !isSearching && !isRecognizing && !isParsing && parsedFoods.isEmpty && !recentFoods.isEmpty
+        showIdleSections && !recentFoods.isEmpty
     }
 
     var body: some View {
@@ -94,6 +104,11 @@ struct AddFoodView: View {
                             resultsList
                         } else if !searchText.isEmpty && !isSearching {
                             noResults
+                        }
+
+                        // My Products (only when idle)
+                        if showIdleSections && !myProducts.isEmpty {
+                            myProductsSection
                         }
 
                         // Recent foods (only when idle)
@@ -230,6 +245,65 @@ struct AddFoodView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    // MARK: - My Products section
+
+    private var myProductsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "tray.full.fill")
+                    .foregroundStyle(.green)
+                Text("My Products")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 14)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(myProducts) { product in
+                        Button {
+                            quickAddProduct(product)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(product.name)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+                                    .foregroundStyle(.primary)
+                                HStack(spacing: 4) {
+                                    Text("\(Int(product.calories))")
+                                        .foregroundStyle(.green)
+                                    Text("kcal")
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .font(.caption2)
+                                Text("\(Int(product.defaultGrams))g")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(10)
+                            .frame(width: 110, alignment: .leading)
+                            .background(Color.green.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(.green.opacity(0.2))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func quickAddProduct(_ product: SavedProduct) {
+        let food = product.toFoodItem()
+        onSave([food])
+        dismiss()
     }
 
     // MARK: - AI recognition cards

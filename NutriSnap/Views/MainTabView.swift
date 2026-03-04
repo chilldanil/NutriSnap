@@ -18,11 +18,17 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
+            MyProductsView()
+                .tabItem {
+                    Label("Products", systemImage: "tray.full.fill")
+                }
+                .tag(2)
+
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(.green)
     }
