@@ -78,10 +78,16 @@ struct ContentView: View {
                 manager.restoreSavedProducts(from: productRows, into: modelContext)
             }
 
-            // 4. Save everything
+            // 4. Restore body measurements
+            let measurementRows = await manager.fetchBodyMeasurements(userName: userName)
+            if !measurementRows.isEmpty {
+                manager.restoreBodyMeasurements(from: measurementRows, into: modelContext)
+            }
+
+            // 5. Save everything
             try? modelContext.save()
 
-            // 5. Refresh widget
+            // 6. Refresh widget
             WidgetCenter.shared.reloadAllTimelines()
 
             isRestoring = false

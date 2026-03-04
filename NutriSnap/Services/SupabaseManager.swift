@@ -94,6 +94,26 @@ struct SavedProductRow: Codable {
     }
 }
 
+struct BodyMeasurementRow: Codable {
+    let id: String
+    let userName: String
+    let date: String
+    let weight: Double?
+    let bodyFat: Double?
+    let chest: Double?
+    let waist: Double?
+    let hips: Double?
+    let neck: Double?
+    let bicep: Double?
+    let thigh: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, weight, chest, waist, hips, neck, bicep, thigh
+        case userName = "user_name"
+        case bodyFat = "body_fat"
+    }
+}
+
 // MARK: - Supabase Manager
 
 final class SupabaseManager {
@@ -371,6 +391,75 @@ final class SupabaseManager {
             }
             product.userName = row.userName
             context.insert(product)
+        }
+    }
+
+    // MARK: - Push BodyMeasurement
+
+    func pushBodyMeasurement(_ m: BodyMeasurement) {
+        guard !m.userName.isEmpty else { return }
+
+        let row = BodyMeasurementRow(
+            id: m.id.uuidString,
+            userName: m.userName,
+            date: dayFormatter.string(from: m.date),
+            weight: m.weight,
+            bodyFat: m.bodyFat,
+            chest: m.chest,
+            waist: m.waist,
+            hips: m.hips,
+            neck: m.neck,
+            bicep: m.bicep,
+            thigh: m.thigh
+        )
+
+        Task.detached {
+            do {
+                try await self.client.from("body_measurements").upsert(row).execute()
+            } catch {
+                print("[Supabase] pushBodyMeasurement error: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Fetch BodyMeasurements
+
+    func fetchBodyMeasurements(userName: String) async -> [BodyMeasurementRow] {
+        do {
+            let rows: [BodyMeasurementRow] = try await client
+                .from("body_measurements")
+                .select()
+                .eq("user_name", value: userName)
+                .execute()
+                .value
+            return rows
+        } catch {
+            print("[Supabase] fetchBodyMeasurements error: \(error)")
+            return []
+        }
+    }
+
+    // MARK: - Restore BodyMeasurements
+
+    func restoreBodyMeasurements(from rows: [BodyMeasurementRow], into context: ModelContext) {
+        for row in rows {
+            guard let date = dayFormatter.date(from: row.date) else { continue }
+            let m = BodyMeasurement(
+                userName: row.userName,
+                date: date,
+                weight: row.weight,
+                bodyFat: row.bodyFat,
+                chest: row.chest,
+                waist: row.waist,
+                hips: row.hips,
+                neck: row.neck,
+                bicep: row.bicep,
+                thigh: row.thigh
+            )
+            if let uuid = UUID(uuidString: row.id) {
+                m.id = uuid
+            }
+            context.insert(m)
         }
     }
 }

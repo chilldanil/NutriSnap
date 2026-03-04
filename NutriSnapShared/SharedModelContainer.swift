@@ -13,6 +13,7 @@ enum SharedModelContainer {
             DailyLog.self,
             UserProfile.self,
             SavedProduct.self,
+            BodyMeasurement.self,
         ])
 
         guard let groupURL = FileManager.default.containerURL(

@@ -18,17 +18,23 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
+            BodyTrackingView()
+                .tabItem {
+                    Label("Body", systemImage: "figure.arms.open")
+                }
+                .tag(2)
+
             MyProductsView()
                 .tabItem {
                     Label("Products", systemImage: "tray.full.fill")
                 }
-                .tag(2)
+                .tag(3)
 
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(3)
+                .tag(4)
         }
         .tint(.green)
     }

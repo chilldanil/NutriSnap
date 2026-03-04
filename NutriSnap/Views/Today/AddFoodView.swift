@@ -28,6 +28,12 @@ struct AddFoodView: View {
     @State private var recognitionError: String?
     @State private var aiEstimatedGrams: Double = 100
 
+    // Barcode scanning
+    @State private var showBarcodeScanner = false
+    @State private var isLookingUpBarcode = false
+    @State private var barcodeLookupError: String?
+    @State private var pendingBarcode: String?
+
     // AI Meal Description
     @State private var showMealDescription = false
     @State private var mealDescriptionText = ""
@@ -69,7 +75,7 @@ struct AddFoodView: View {
     }
 
     private var showIdleSections: Bool {
-        searchText.isEmpty && searchResults.isEmpty && !isSearching && !isRecognizing && !isParsing && parsedFoods.isEmpty
+        searchText.isEmpty && searchResults.isEmpty && !isSearching && !isRecognizing && !isLookingUpBarcode && !isParsing && parsedFoods.isEmpty
     }
 
     private var showRecentSection: Bool {
@@ -91,6 +97,10 @@ struct AddFoodView: View {
                         if isRecognizing { recognizingCard }
                         if let result = recognitionResult { aiResultCard(result) }
                         if let err = recognitionError { errorCard(err) }
+
+                        // Barcode lookup
+                        if isLookingUpBarcode { barcodeLookupCard }
+                        if let err = barcodeLookupError { errorCard(err) }
 
                         // AI meal description results
                         if isParsing { parsingCard }
@@ -170,6 +180,7 @@ struct AddFoodView: View {
                     Button("Take Photo") { showCamera = true }
                 }
                 Button("Choose from Library") { showPhotoLibrary = true }
+                Button("Scan Barcode") { showBarcodeScanner = true }
             }
             .fullScreenCover(isPresented: $showCamera) {
                 ImagePicker(source: .camera) { image in
@@ -181,6 +192,15 @@ struct AddFoodView: View {
                 ImagePicker(source: .photoLibrary) { image in
                     handleCapturedImage(image)
                 }
+            }
+            .fullScreenCover(isPresented: $showBarcodeScanner) {
+                BarcodeScannerView(scannedCode: $pendingBarcode)
+                    .ignoresSafeArea()
+            }
+            .onChange(of: pendingBarcode) { _, barcode in
+                guard let barcode else { return }
+                pendingBarcode = nil
+                handleScannedBarcode(barcode)
             }
         }
     }
@@ -401,6 +421,33 @@ struct AddFoodView: View {
         .background(Color.orange.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal).padding(.top, 8)
+    }
+
+    // MARK: - Barcode lookup card
+
+    private var barcodeLookupCard: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "barcode.viewfinder")
+                .font(.title2)
+                .foregroundStyle(.green)
+                .frame(width: 56, height: 56)
+                .background(Color.green.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Looking up product...")
+                        .font(.subheadline.weight(.medium))
+                }
+                Text("Searching OpenFoodFacts database")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal).padding(.top, 12)
     }
 
     // MARK: - Meal description section
@@ -697,6 +744,40 @@ struct AddFoodView: View {
             searchResults = []
         }
         isSearching = false
+    }
+
+    private func handleScannedBarcode(_ barcode: String) {
+        isLookingUpBarcode = true
+        barcodeLookupError = nil
+
+        Task {
+            do {
+                let product = try await OpenFoodFactsService.shared.lookupBarcode(barcode)
+                await MainActor.run {
+                    isLookingUpBarcode = false
+                    let displayName: String
+                    if let brand = product.brand {
+                        displayName = "\(brand) – \(product.name)"
+                    } else {
+                        displayName = product.name
+                    }
+                    portionAdjust = PortionAdjustData(
+                        name: displayName,
+                        calories: product.caloriesPer100g,
+                        protein: product.proteinPer100g,
+                        fat: product.fatPer100g,
+                        carbs: product.carbsPer100g,
+                        grams: 100,
+                        edamamFoodId: nil
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    isLookingUpBarcode = false
+                    barcodeLookupError = "Barcode not found: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     private func handleCapturedImage(_ image: UIImage) {

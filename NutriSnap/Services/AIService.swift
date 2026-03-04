@@ -182,6 +182,83 @@ actor AIService {
         return try JSONDecoder().decode([ParsedFoodItem].self, from: jsonData)
     }
 
+    // MARK: - Nutrition label scanning
+
+    struct NutritionLabelResult: Sendable, Codable {
+        let productName: String
+        let caloriesPer100g: Double
+        let proteinPer100g: Double
+        let fatPer100g: Double
+        let carbsPer100g: Double
+        let suggestedServingGrams: Double
+    }
+
+    /// Parse a photo of a nutrition label (back of product) into structured data.
+    func parseNutritionLabel(image: UIImage) async throws -> NutritionLabelResult {
+        guard let jpegData = image.jpegData(compressionQuality: 0.7) else {
+            throw AIError.badResponse
+        }
+
+        let base64 = jpegData.base64EncodedString()
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 512,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": [
+                        [
+                            "type": "image",
+                            "source": [
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64
+                            ]
+                        ],
+                        [
+                            "type": "text",
+                            "text": """
+                            Read the nutrition label in this image and extract values.
+                            Return ONLY a JSON object (no markdown, no explanation):
+                            {"productName": "product name or best guess", "caloriesPer100g": number, "proteinPer100g": number, "fatPer100g": number, "carbsPer100g": number, "suggestedServingGrams": number}
+
+                            Rules:
+                            - All nutrition values MUST be per 100g, even if the label shows per serving — recalculate to per 100g
+                            - If the label already shows per 100g, use those values directly
+                            - suggestedServingGrams: the serving/portion size from the label (e.g. 30g for protein powder, 250ml for drink). If not specified, use 100
+                            - productName: read it from the label or packaging if visible, otherwise make a reasonable guess
+                            - The label can be in ANY language (German, Russian, English, etc.) — parse it correctly regardless
+                            - Calories means kcal (not kJ). If only kJ shown, divide by 4.184
+                            - Eiweiß = Protein, Fett = Fat, Kohlenhydrate = Carbs (German)
+                            - Белки = Protein, Жиры = Fat, Углеводы = Carbs (Russian)
+                            """
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let data = try await callClaude(body: body)
+
+        struct ClaudeResponse: Codable {
+            struct Content: Codable { let text: String? }
+            let content: [Content]
+        }
+
+        let response = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+        guard let text = response.content.first?.text else {
+            throw AIError.badResponse
+        }
+
+        let jsonString = extractJSON(from: text)
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            throw AIError.noParsableJSON
+        }
+
+        return try JSONDecoder().decode(NutritionLabelResult.self, from: jsonData)
+    }
+
     // MARK: - Network
 
     private func callClaude(body: [String: Any]) async throws -> Data {

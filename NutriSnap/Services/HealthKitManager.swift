@@ -14,6 +14,11 @@ actor HealthKitManager {
         HKQuantityType(.dietaryWater),
     ]
 
+    private let bodyTypes: Set<HKSampleType> = [
+        HKQuantityType(.bodyMass),
+        HKQuantityType(.bodyFatPercentage),
+    ]
+
     /// Types we only read (energy burned from Apple Watch / iPhone motion)
     private let readOnlyTypes: Set<HKSampleType> = [
         HKQuantityType(.activeEnergyBurned),
@@ -28,10 +33,11 @@ actor HealthKitManager {
 
     func requestAuthorization() async throws {
         guard isAvailable else { return }
-        // Write: dietary samples. Read: dietary + energy burned.
+        let writeTypes = dietaryTypes.union(bodyTypes)
         let allReadTypes: Set<HKObjectType> = Set(dietaryTypes.map { $0 as HKObjectType })
             .union(readOnlyTypes.map { $0 as HKObjectType })
-        try await store.requestAuthorization(toShare: dietaryTypes, read: allReadTypes)
+            .union(bodyTypes.map { $0 as HKObjectType })
+        try await store.requestAuthorization(toShare: writeTypes, read: allReadTypes)
     }
 
     // MARK: - Write dietary samples
@@ -64,6 +70,28 @@ actor HealthKitManager {
         let sample = HKQuantitySample(
             type: HKQuantityType(.dietaryWater),
             quantity: HKQuantity(unit: .literUnit(with: .milli), doubleValue: ml),
+            start: date, end: date
+        )
+        try await store.save(sample)
+    }
+
+    // MARK: - Write body measurements
+
+    func saveWeight(kg: Double, date: Date = Date()) async throws {
+        guard isAvailable, kg > 0 else { return }
+        let sample = HKQuantitySample(
+            type: HKQuantityType(.bodyMass),
+            quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: kg),
+            start: date, end: date
+        )
+        try await store.save(sample)
+    }
+
+    func saveBodyFat(percent: Double, date: Date = Date()) async throws {
+        guard isAvailable, percent > 0 else { return }
+        let sample = HKQuantitySample(
+            type: HKQuantityType(.bodyFatPercentage),
+            quantity: HKQuantity(unit: .percent(), doubleValue: percent / 100),
             start: date, end: date
         )
         try await store.save(sample)
