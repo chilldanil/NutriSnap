@@ -1,0 +1,25 @@
+# API Keys & Secrets
+NutriSnap/Config.swift
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Swift Package Manager
+.build/
+Packages/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# CocoaPods
+Pods/
+
+# Environment
+.env
+*.env
