@@ -4,8 +4,11 @@ import SwiftData
 struct HistoryView: View {
     @AppStorage("currentUser") private var currentUser = ""
     @Query(sort: \DailyLog.date, order: .reverse) private var allLogs: [DailyLog]
+    @Query private var profiles: [UserProfile]
     @State private var selectedDate = Date()
     @State private var showCalendar = true
+    @State private var activeCalories: Double = 0
+    @State private var basalCalories: Double = 0
 
     private var logs: [DailyLog] {
         allLogs.filter { $0.userName == currentUser }
@@ -15,12 +18,16 @@ struct HistoryView: View {
         logs.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
     }
 
+    private var isHealthKitEnabled: Bool {
+        profiles.first(where: { $0.userName == currentUser })?.isHealthKitEnabled ?? false
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     // Weekly chart
-                    WeeklyChartView(logs: logs)
+                    WeeklyChartView(logs: logs, isHealthKitEnabled: isHealthKitEnabled)
 
                     // Calendar toggle
                     Button {
@@ -57,6 +64,15 @@ struct HistoryView: View {
 
                     // Day detail
                     if let log = selectedLog {
+                        // Energy Balance (burned calories)
+                        if isHealthKitEnabled {
+                            EnergyBalanceView(
+                                consumed: log.totalCalories,
+                                active: activeCalories,
+                                basal: basalCalories
+                            )
+                        }
+
                         daySummary(log)
                     } else {
                         VStack(spacing: 8) {
@@ -77,10 +93,39 @@ struct HistoryView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("History")
+            .onAppear {
+                fetchBurnedCalories(for: selectedDate)
+            }
+            .onChange(of: selectedDate) { _, newDate in
+                fetchBurnedCalories(for: newDate)
+            }
         }
     }
 
     // MARK: - Day summary
+
+    private func fetchBurnedCalories(for date: Date) {
+        guard isHealthKitEnabled else {
+            activeCalories = 0
+            basalCalories = 0
+            return
+        }
+        Task {
+            do {
+                let burned = try await HealthKitManager.shared.caloriesBurned(for: date)
+                await MainActor.run {
+                    activeCalories = burned.active
+                    basalCalories = burned.basal
+                }
+            } catch {
+                print("[HealthKit] fetchBurnedCalories error: \(error)")
+                await MainActor.run {
+                    activeCalories = 0
+                    basalCalories = 0
+                }
+            }
+        }
+    }
 
     private func daySummary(_ log: DailyLog) -> some View {
         VStack(spacing: 12) {

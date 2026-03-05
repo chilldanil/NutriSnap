@@ -134,6 +134,25 @@ actor HealthKitManager {
         return try await (active, basal)
     }
 
+    /// Returns energy expenditure for a specific date from HealthKit.
+    func caloriesBurned(for date: Date) async throws -> (active: Double, basal: Double) {
+        guard isAvailable else { return (0, 0) }
+
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        let end: Date
+        if calendar.isDateInToday(date) {
+            end = Date()
+        } else {
+            end = calendar.date(byAdding: .day, value: 1, to: start)!
+        }
+
+        async let active = sumQuantity(.activeEnergyBurned, unit: .kilocalorie(), start: start, end: end)
+        async let basal  = sumQuantity(.basalEnergyBurned, unit: .kilocalorie(), start: start, end: end)
+
+        return try await (active, basal)
+    }
+
     // MARK: - Helpers
 
     private func buildSamples(
