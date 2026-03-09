@@ -12,12 +12,22 @@ struct GymTrackingView: View {
     @State private var editingSession: GymSession?
     @State private var selectedExercise: GymExercise = .brustpresse
     @State private var chartPeriod: ChartPeriod = .threeMonths
+    @State private var showCopiedToast = false
+    @State private var copiedCount = 0
+    @State private var isCopyMode = false
+    @State private var selectedSessionIDs: Set<UUID> = []
 
     private var sessions: [GymSession] {
         allSessions.filter { $0.userName == currentUser }
     }
 
     private var latest: GymSession? { sessions.first }
+
+    private var selectedSessionsForCopy: [GymSession] {
+        sessions
+            .filter { selectedSessionIDs.contains($0.id) }
+            .sorted { $0.date < $1.date }
+    }
 
     // Sessions this week
     private var thisWeekCount: Int {
@@ -43,38 +53,71 @@ struct GymTrackingView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    if sessions.isEmpty {
-                        emptyState
-                    } else {
-                        startButton
-                        statsRow
-                        progressChart
-                        historySection
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        if sessions.isEmpty {
+                            emptyState
+                        } else {
+                            startButton
+                            statsRow
+                            progressChart
+                            historySection
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 80)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 80)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Sport")
-            .toolbar {
-                if !sessions.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { showActiveWorkout = true } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title3)
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("Sport")
+                .toolbar {
+                    if !sessions.isEmpty {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            if isCopyMode {
+                                Button("Done") {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        isCopyMode = false
+                                        selectedSessionIDs.removeAll()
+                                    }
+                                }
+                                .foregroundStyle(.orange)
+                                .fontWeight(.semibold)
+                            } else {
+                                Button {
+                                    enterCopyMode()
+                                } label: {
+                                    Image(systemName: showCopiedToast ? "checkmark" : "doc.on.doc")
+                                        .font(.body.weight(.medium))
+                                        .foregroundStyle(showCopiedToast ? .green : .primary)
+                                        .contentTransition(.symbolEffect(.replace))
+                                }
+
+                                Button { showActiveWorkout = true } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title3)
+                                }
+                            }
                         }
                     }
                 }
-            }
-            .fullScreenCover(isPresented: $showActiveWorkout) {
-                ActiveWorkoutView(previousSession: latest)
-            }
-            .sheet(item: $editingSession) { session in
-                SessionDetailView(session: session)
-                    .presentationDetents([.large])
+                .overlay(alignment: .top) {
+                    if showCopiedToast {
+                        copiedToast
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                .fullScreenCover(isPresented: $showActiveWorkout) {
+                    ActiveWorkoutView(previousSession: latest)
+                }
+                .sheet(item: $editingSession) { session in
+                    SessionDetailView(session: session)
+                        .presentationDetents([.large])
+                }
+
+                if isCopyMode {
+                    copyBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
     }
@@ -279,14 +322,35 @@ struct GymTrackingView: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("History")
-                .font(.headline)
+            HStack {
+                Text("History")
+                    .font(.headline)
+
+                Spacer()
+
+                if isCopyMode {
+                    Text("\(selectedSessionIDs.count) selected")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
 
             ForEach(sessions.prefix(30)) { session in
                 sessionRow(session)
                     .contentShape(Rectangle())
-                    .onTapGesture { editingSession = session }
+                    .onTapGesture {
+                        if isCopyMode {
+                            toggleSessionSelection(session)
+                        } else {
+                            editingSession = session
+                        }
+                    }
                     .contextMenu {
+                        Button {
+                            copySessions([session])
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
                         Button {
                             editingSession = session
                         } label: {
@@ -309,7 +373,9 @@ struct GymTrackingView: View {
     }
 
     private func sessionRow(_ session: GymSession) -> some View {
-        HStack(spacing: 14) {
+        let isSelected = selectedSessionIDs.contains(session.id)
+
+        return HStack(spacing: 14) {
             VStack(spacing: 2) {
                 Text(session.date, format: .dateTime.day())
                     .font(.title3.bold().monospacedDigit())
@@ -345,17 +411,123 @@ struct GymTrackingView: View {
             }
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            Image(systemName: isCopyMode ? (isSelected ? "checkmark.circle.fill" : "circle") : "chevron.right")
+                .font(isCopyMode ? .title3 : .caption2.weight(.semibold))
+                .foregroundStyle(isCopyMode ? (isSelected ? Color.orange : Color.gray.opacity(0.45)) : Color.secondary.opacity(0.6))
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(isCopyMode && isSelected ? Color.orange.opacity(0.12) : .clear)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Copy
+
+    private func enterCopyMode() {
+        withAnimation(.spring(response: 0.3)) {
+            isCopyMode = true
+            selectedSessionIDs.removeAll()
+            if let latest {
+                selectedSessionIDs.insert(latest.id)
+            }
+        }
+    }
+
+    private func toggleSessionSelection(_ session: GymSession) {
+        withAnimation(.spring(response: 0.2)) {
+            if selectedSessionIDs.contains(session.id) {
+                selectedSessionIDs.remove(session.id)
+            } else {
+                selectedSessionIDs.insert(session.id)
+            }
+        }
+    }
+
+    private var copyBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    selectedSessionIDs.removeAll()
+                }
+            } label: {
+                Text("Clear")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                copySelectedSessions()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.on.doc.fill")
+                    let count = selectedSessionIDs.count
+                    Text(count == 1 ? "Copy 1 workout" : "Copy \(count) workouts")
+                        .fontWeight(.semibold)
+                }
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(selectedSessionIDs.isEmpty ? Color.gray : Color.orange)
+                .clipShape(Capsule())
+            }
+            .disabled(selectedSessionIDs.isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+    }
+
+    private func copySelectedSessions() {
+        copySessions(selectedSessionsForCopy, exitCopyMode: true)
+    }
+
+    private func copySessions(_ sessionsToCopy: [GymSession], exitCopyMode: Bool = false) {
+        guard !sessionsToCopy.isEmpty else { return }
+
+        let combined = sessionsToCopy
+            .map(\.clipboardText)
+            .joined(separator: "\n\n━━━━━━━━━━━━━━━━━━━━\n\n")
+
+        UIPasteboard.general.string = combined
+        copiedCount = sessionsToCopy.count
+
+        withAnimation(.spring(response: 0.3)) {
+            showCopiedToast = true
+            if exitCopyMode {
+                isCopyMode = false
+                selectedSessionIDs.removeAll()
+            }
+        }
+
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.spring(response: 0.3)) {
+                showCopiedToast = false
+            }
+        }
+    }
+
+    private var copiedToast: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text(copiedCount > 1 ? "\(copiedCount) workouts copied" : "Copied to clipboard")
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.top, 8)
     }
 
     // MARK: - Delete
 
     private func deleteSession(_ session: GymSession) {
         SupabaseManager.shared.deleteGymSession(id: session.id.uuidString)
+        selectedSessionIDs.remove(session.id)
         modelContext.delete(session)
         try? modelContext.save()
     }

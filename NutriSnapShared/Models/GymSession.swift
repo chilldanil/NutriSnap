@@ -61,4 +61,54 @@ final class GymSession {
         let s = durationSeconds % 60
         return String(format: "%d:%02d", m, s)
     }
+
+    var clipboardText: String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateStyle = .full
+
+        var lines: [String] = []
+        lines.append("Workout - \(formatter.string(from: date))")
+
+        var summaryParts = [
+            "\(exerciseCount) exercises",
+            "\(completedSetCount) sets"
+        ]
+        if durationSeconds > 0 {
+            summaryParts.append(formattedDuration)
+        }
+        if totalVolume > 0 {
+            summaryParts.append("\(totalVolume.workoutNumberFormatted) kg volume")
+        }
+        lines.append(summaryParts.joined(separator: " · "))
+
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedNotes.isEmpty {
+            lines.append("")
+            lines.append("Notes: \(trimmedNotes)")
+        }
+
+        for exercise in exercises {
+            let completedSets = sets(for: exercise).filter(\.isCompleted)
+            guard !completedSets.isEmpty else { continue }
+
+            lines.append("")
+            lines.append(exercise.rawValue)
+
+            for gymSet in completedSets {
+                lines.append("\(gymSet.setNumber). \(gymSet.weight.workoutNumberFormatted) kg x \(gymSet.reps)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
+private extension Double {
+    var workoutNumberFormatted: String {
+        if truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f", self)
+        }
+        return String(format: "%.1f", self)
+    }
 }

@@ -9,6 +9,7 @@ struct SessionDetailView: View {
 
     @State private var showExercisePicker = false
     @State private var showDeleteConfirmation = false
+    @State private var showCopiedToast = false
 
     var body: some View {
         NavigationStack {
@@ -27,12 +28,28 @@ struct SessionDetailView: View {
             .navigationTitle("Workout Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        copyWorkout()
+                    } label: {
+                        Image(systemName: showCopiedToast ? "checkmark" : "doc.on.doc")
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(showCopiedToast ? .green : .primary)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .fontWeight(.semibold)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .overlay(alignment: .top) {
+                if showCopiedToast {
+                    copiedToast
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -269,6 +286,20 @@ struct SessionDetailView: View {
 
     // MARK: - Actions
 
+    private func copyWorkout() {
+        UIPasteboard.general.string = session.clipboardText
+
+        withAnimation(.spring(response: 0.3)) {
+            showCopiedToast = true
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.spring(response: 0.3)) {
+                showCopiedToast = false
+            }
+        }
+    }
+
     private func addExercise(_ exercise: GymExercise) {
         for i in 1...3 {
             let set = GymSet(exercise: exercise, weight: 0, reps: 12, setNumber: i, isCompleted: true)
@@ -324,6 +355,19 @@ struct SessionDetailView: View {
         modelContext.delete(session)
         try? modelContext.save()
         dismiss()
+    }
+
+    private var copiedToast: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Copied to clipboard")
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.top, 8)
     }
 }
 
