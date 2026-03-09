@@ -245,7 +245,20 @@ final class DailyLogViewModel {
 
     func copyDayToClipboard() -> String {
         guard let log = todayLog else { return "" }
+        return Self.formatDayText(
+            log: log,
+            activeCalories: activeCaloriesBurned,
+            basalCalories: basalCaloriesBurned
+        )
+    }
 
+    /// Reusable: format any DailyLog as shareable text.
+    /// Can be called from HistoryView or anywhere else.
+    static func formatDayText(
+        log: DailyLog,
+        activeCalories: Double = 0,
+        basalCalories: Double = 0
+    ) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "d MMMM yyyy"
         let dateStr = dateFormatter.string(from: log.date)
@@ -282,18 +295,19 @@ final class DailyLogViewModel {
         lines.append("Day Total: \(Int(log.totalCalories)) kcal | P: \(fmtG(log.totalProtein)) | F: \(fmtG(log.totalFat)) | C: \(fmtG(log.totalCarbs))")
         lines.append("Water: \(Int(log.waterMl)) / \(Int(log.waterTarget)) ml")
 
-        if totalCaloriesBurned > 0 {
+        let totalBurned = activeCalories + basalCalories
+        if totalBurned > 0 {
             lines.append("")
-            lines.append("Calories Burned: \(Int(totalCaloriesBurned)) kcal (Active: \(Int(activeCaloriesBurned)) + BMR: \(Int(basalCaloriesBurned)))")
-            let net = Int(netEnergyBalance)
+            lines.append("Calories Burned: \(Int(totalBurned)) kcal (Active: \(Int(activeCalories)) + BMR: \(Int(basalCalories)))")
+            let net = Int(log.totalCalories - totalBurned)
             let label = net < 0 ? "deficit" : net > 0 ? "surplus" : "balance"
-            lines.append("Net: \(Int(log.totalCalories)) - \(Int(totalCaloriesBurned)) = \(net) kcal (\(label))")
+            lines.append("Net: \(Int(log.totalCalories)) - \(Int(totalBurned)) = \(net) kcal (\(label))")
         }
 
         return lines.joined(separator: "\n")
     }
 
-    private func fmtG(_ value: Double) -> String {
+    private static func fmtG(_ value: Double) -> String {
         value.truncatingRemainder(dividingBy: 1) == 0
             ? "\(Int(value))g"
             : String(format: "%.1fg", value)

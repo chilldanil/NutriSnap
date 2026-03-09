@@ -94,6 +94,33 @@ struct SavedProductRow: Codable {
     }
 }
 
+struct GymSetData: Codable {
+    let exerciseRaw: String
+    let weight: Double
+    let reps: Int
+    let setNumber: Int
+
+    enum CodingKeys: String, CodingKey {
+        case exerciseRaw = "exercise"
+        case weight, reps
+        case setNumber = "set_number"
+    }
+}
+
+struct GymSessionRow: Codable {
+    let id: String
+    let userName: String
+    let date: String
+    let durationSeconds: Int
+    let sets: [GymSetData]
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, sets
+        case userName = "user_name"
+        case durationSeconds = "duration_seconds"
+    }
+}
+
 struct BodyMeasurementRow: Codable {
     let id: String
     let userName: String
@@ -475,6 +502,100 @@ final class SupabaseManager {
                 m.id = uuid
             }
             context.insert(m)
+        }
+    }
+
+    // MARK: - Push GymSession
+
+    func pushGymSession(_ session: GymSession) {
+        guard !session.userName.isEmpty else { return }
+
+        let setsData: [GymSetData] = session.sets
+            .filter(\.isCompleted)
+            .map { set in
+                GymSetData(
+                    exerciseRaw: set.exerciseRaw,
+                    weight: set.weight,
+                    reps: set.reps,
+                    setNumber: set.setNumber
+                )
+            }
+
+        let row = GymSessionRow(
+            id: session.id.uuidString,
+            userName: session.userName,
+            date: dayFormatter.string(from: session.date),
+            durationSeconds: session.durationSeconds,
+            sets: setsData
+        )
+
+        Task.detached {
+            do {
+                try await self.client.from("gym_sessions").upsert(row).execute()
+            } catch {
+                print("[Supabase] pushGymSession error: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Delete GymSession
+
+    func deleteGymSession(id: String) {
+        Task.detached {
+            do {
+                try await self.client.from("gym_sessions")
+                    .delete()
+                    .eq("id", value: id)
+                    .execute()
+            } catch {
+                print("[Supabase] deleteGymSession error: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Fetch GymSessions
+
+    func fetchGymSessions(userName: String) async -> [GymSessionRow] {
+        do {
+            let rows: [GymSessionRow] = try await client
+                .from("gym_sessions")
+                .select()
+                .eq("user_name", value: userName)
+                .execute()
+                .value
+            return rows
+        } catch {
+            print("[Supabase] fetchGymSessions error: \(error)")
+            return []
+        }
+    }
+
+    // MARK: - Restore GymSessions
+
+    func restoreGymSessions(from rows: [GymSessionRow], into context: ModelContext) {
+        for row in rows {
+            guard let date = dayFormatter.date(from: row.date) else { continue }
+            let session = GymSession(
+                userName: row.userName,
+                date: date,
+                durationSeconds: row.durationSeconds
+            )
+            if let uuid = UUID(uuidString: row.id) {
+                session.id = uuid
+            }
+            context.insert(session)
+
+            for setData in row.sets {
+                guard let exercise = GymExercise(rawValue: setData.exerciseRaw) else { continue }
+                let set = GymSet(
+                    exercise: exercise,
+                    weight: setData.weight,
+                    reps: setData.reps,
+                    setNumber: setData.setNumber,
+                    isCompleted: true
+                )
+                session.sets.append(set)
+            }
         }
     }
 }

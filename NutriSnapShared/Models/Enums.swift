@@ -120,6 +120,58 @@ enum Gender: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// MARK: - Gym Exercises
+
+enum GymExercise: String, Codable, CaseIterable, Identifiable {
+    case schulterpresse = "Schulterpresse"
+    case latzug = "Latzug"
+    case bizeps = "Bizeps"
+    case bauchtrainer = "Bauchtrainer"
+    case beinstrecker = "Beinstrecker"
+    case beinbeuger = "Beinbeuger"
+    case ruderzug = "Ruderzug"
+    case brustpresse = "Brustpresse"
+
+    var id: String { rawValue }
+
+    var subtitle: String {
+        switch self {
+        case .schulterpresse: "Shoulder Press"
+        case .latzug: "Lat Pulldown"
+        case .bizeps: "Bicep Curl"
+        case .bauchtrainer: "Ab Trainer"
+        case .beinstrecker: "Leg Extension"
+        case .beinbeuger: "Leg Curl"
+        case .ruderzug: "Seated Row"
+        case .brustpresse: "Chest Press"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .schulterpresse: "figure.arms.open"
+        case .latzug: "figure.rowing"
+        case .bizeps: "figure.strengthtraining.traditional"
+        case .bauchtrainer: "figure.core.training"
+        case .beinstrecker: "figure.walk"
+        case .beinbeuger: "figure.step.training"
+        case .ruderzug: "figure.rower"
+        case .brustpresse: "figure.highintensity.intervaltraining"
+        }
+    }
+
+    var muscleGroup: String {
+        switch self {
+        case .schulterpresse: "Shoulders"
+        case .latzug, .ruderzug: "Back"
+        case .bizeps: "Arms"
+        case .bauchtrainer: "Core"
+        case .beinstrecker, .beinbeuger: "Legs"
+        case .brustpresse: "Chest"
+        }
+    }
+}
+
 // MARK: - App Users (hardcoded for 2 people)
 
 enum AppUser: String, CaseIterable, Identifiable {

@@ -7,7 +7,7 @@ struct PreviewContainer {
     static let shared: ModelContainer = {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(
-            for: FoodItem.self, MealEntry.self, DailyLog.self, UserProfile.self,
+            for: FoodItem.self, MealEntry.self, DailyLog.self, UserProfile.self, GymSession.self, GymSet.self,
             configurations: config
         )
         addSampleData(to: container.mainContext)

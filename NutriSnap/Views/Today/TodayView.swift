@@ -54,7 +54,8 @@ struct TodayView: View {
                         // Calories
                         CalorieProgressView(
                             eaten: log?.totalCalories ?? 0,
-                            target: log?.targetCalories ?? 2000
+                            target: log?.targetCalories ?? 2000,
+                            meals: log?.sortedMeals ?? []
                         )
 
                         // Macros
@@ -64,7 +65,8 @@ struct TodayView: View {
                             fat: log?.totalFat ?? 0,
                             fatTarget: log?.targetFat ?? 65,
                             carbs: log?.totalCarbs ?? 0,
-                            carbsTarget: log?.targetCarbs ?? 250
+                            carbsTarget: log?.targetCarbs ?? 250,
+                            meals: log?.sortedMeals ?? []
                         )
 
                         // Energy Balance (HealthKit burned calories)

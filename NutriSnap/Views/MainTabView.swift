@@ -24,17 +24,23 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
+            GymTrackingView()
+                .tabItem {
+                    Label("Sport", systemImage: "dumbbell.fill")
+                }
+                .tag(3)
+
             MyProductsView()
                 .tabItem {
                     Label("Products", systemImage: "tray.full.fill")
                 }
-                .tag(3)
+                .tag(4)
 
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(4)
+                .tag(5)
         }
         .tint(.green)
     }

@@ -84,10 +84,16 @@ struct ContentView: View {
                 manager.restoreBodyMeasurements(from: measurementRows, into: modelContext)
             }
 
-            // 5. Save everything
+            // 5. Restore gym sessions
+            let gymRows = await manager.fetchGymSessions(userName: userName)
+            if !gymRows.isEmpty {
+                manager.restoreGymSessions(from: gymRows, into: modelContext)
+            }
+
+            // 6. Save everything
             try? modelContext.save()
 
-            // 6. Refresh widget
+            // 7. Refresh widget
             WidgetCenter.shared.reloadAllTimelines()
 
             isRestoring = false
@@ -97,7 +103,7 @@ struct ContentView: View {
 
 #Preview("Picker") {
     ContentView()
-        .modelContainer(for: [FoodItem.self, MealEntry.self, DailyLog.self, UserProfile.self, SavedProduct.self], inMemory: true)
+        .modelContainer(for: [FoodItem.self, MealEntry.self, DailyLog.self, UserProfile.self, SavedProduct.self, GymSession.self, GymSet.self], inMemory: true)
         .preferredColorScheme(.dark)
 }
 
